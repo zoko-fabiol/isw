@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, FileText, FileSpreadsheet, Download, Users, Clock, AlarmClock, CreditCard, TrendingUp, Loader2, CheckCircle2 } from 'lucide-react';
+import { 
+  BarChart3, FileText, FileSpreadsheet, Download, Users, Clock, AlarmClock, CreditCard, 
+  TrendingUp, Loader2, CheckCircle2, UserRound, Coins, Building2, Calendar 
+} from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { exportToPDF, exportToExcel, formatFCFA } from '../services/exportService';
 
@@ -24,12 +27,17 @@ function ReportCard({ icon: Icon, iconColor, iconBg, gradient, title, descriptio
 
         {/* Stats */}
         <div className="flex flex-wrap gap-2">
-          {stats.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-600">
-              <span className="text-isw-blue">{s.icon}</span>
-              {s.label}
-            </span>
-          ))}
+          {stats.map((s, i) => {
+            const StatIcon = s.icon;
+            return (
+              <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-600">
+                <span className="text-isw-blue flex items-center">
+                  <StatIcon className="w-3.5 h-3.5" />
+                </span>
+                {s.label}
+              </span>
+            );
+          })}
         </div>
 
         {/* Boutons */}
@@ -66,7 +74,11 @@ export default function Reports() {
   const [overtimeList, setOvertimeList] = useState([]);
   const [payrolls, setPayrolls] = useState([]);
   const [settings, setSettings] = useState({ standardHours: 173, socialContributionRate: 12 });
-  const [selectedMonth, setSelectedMonth] = useState('2026-06');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthStr());
   const [selectedDept, setSelectedDept] = useState('Tous');
   const [loading, setLoading] = useState({});
   const [toasts, setToasts] = useState([]);
@@ -413,19 +425,24 @@ export default function Reports() {
       {/* KPI résumé */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Taux de présence', value: `${avgRate}%`, icon: '📊', color: 'text-isw-blue', bg: 'bg-isw-blue-50' },
-          { label: 'Retards cumulés', value: `${totalDelayMin} min`, icon: '⏱', color: 'text-rose-700', bg: 'bg-rose-50' },
-          { label: 'Heures supplémentaires', value: `${totalOtHours} h`, icon: '📈', color: 'text-emerald-700', bg: 'bg-emerald-50' },
-          { label: 'Masse salariale nette', value: formatFCFA(totalNetPay), icon: '💳', color: 'text-isw-navy', bg: 'bg-isw-blue-50/50' },
-        ].map((kpi, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center gap-3">
-            <span className={`text-2xl w-10 h-10 flex items-center justify-center rounded-xl ${kpi.bg} flex-shrink-0`}>{kpi.icon}</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{kpi.label}</p>
-              <p className={`text-lg font-black ${kpi.color} truncate`}>{kpi.value}</p>
+          { label: 'Taux de présence', value: `${avgRate}%`, icon: BarChart3, color: 'text-isw-blue', bg: 'bg-isw-blue-50' },
+          { label: 'Retards cumulés', value: `${totalDelayMin} min`, icon: AlarmClock, color: 'text-rose-700', bg: 'bg-rose-50' },
+          { label: 'Heures supplémentaires', value: `${totalOtHours} h`, icon: TrendingUp, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+          { label: 'Masse salariale nette', value: formatFCFA(totalNetPay), icon: CreditCard, color: 'text-isw-navy', bg: 'bg-isw-blue-50/50' },
+        ].map((kpi, i) => {
+          const IconComp = kpi.icon;
+          return (
+            <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center gap-3">
+              <span className={`w-10 h-10 flex items-center justify-center rounded-xl ${kpi.bg} ${kpi.color} flex-shrink-0`}>
+                <IconComp className="w-5 h-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{kpi.label}</p>
+                <p className={`text-lg font-black ${kpi.color} truncate`}>{kpi.value}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Grille de cartes de rapports */}
@@ -439,9 +456,9 @@ export default function Reports() {
           title="Bilan de Présence"
           description="Taux de présence, absences justifiées/injustifiées et congés par collaborateur pour le mois sélectionné."
           stats={[
-            { icon: '👥', label: `${filteredEmps.length} employés` },
-            { icon: '✅', label: `${totalPresent} jours présents` },
-            { icon: '📊', label: `Taux : ${avgRate}%` },
+            { icon: UserRound, label: `${filteredEmps.length} employés` },
+            { icon: CheckCircle2, label: `${totalPresent} jours présents` },
+            { icon: BarChart3, label: `Taux : ${avgRate}%` },
           ]}
           onExportPDF={handlePresencePDF}
           onExportExcel={handlePresenceExcel}
@@ -456,8 +473,8 @@ export default function Reports() {
           title="Bilan des Retards"
           description="Nombre de retards, minutes cumulées non justifiées et retenues financières calculées automatiquement."
           stats={[
-            { icon: '⏱', label: `${filteredDel.length} retards` },
-            { icon: '🕐', label: `${totalDelayMin} min` },
+            { icon: AlarmClock, label: `${filteredDel.length} retards` },
+            { icon: Clock, label: `${totalDelayMin} min` },
           ]}
           onExportPDF={handleRetardsPDF}
           onExportExcel={handleRetardsExcel}
@@ -472,8 +489,8 @@ export default function Reports() {
           title="Bilan Heures Supplémentaires"
           description="Comparatif heures contractuelles vs réelles, écart et rémunération des heures supplémentaires (+25%)."
           stats={[
-            { icon: '📈', label: `${filteredOvt.length} déclarations` },
-            { icon: '⏰', label: `${totalOtHours} h supplémentaires` },
+            { icon: TrendingUp, label: `${filteredOvt.length} déclarations` },
+            { icon: Clock, label: `${totalOtHours} h supplémentaires` },
           ]}
           onExportPDF={handleOvertimePDF}
           onExportExcel={handleOvertimeExcel}
@@ -488,9 +505,9 @@ export default function Reports() {
           title="Bilan de Paie — Masse Salariale"
           description="Récapitulatif complet de la paie mensuelle : brut, cotisations, retenues retards, net à payer et statut de règlement."
           stats={[
-            { icon: '📋', label: `${filteredPay.length} bulletins` },
-            { icon: '✅', label: `${filteredPay.filter(p => p.paymentStatus === 'Payé').length} réglés` },
-            { icon: '💰', label: formatFCFA(totalNetPay) },
+            { icon: FileText, label: `${filteredPay.length} bulletins` },
+            { icon: CheckCircle2, label: `${filteredPay.filter(p => p.paymentStatus === 'Payé').length} réglés` },
+            { icon: Coins, label: formatFCFA(totalNetPay) },
           ]}
           onExportPDF={handlePaiePDF}
           onExportExcel={handlePaieExcel}
@@ -505,8 +522,8 @@ export default function Reports() {
           title="Bilan Général RH"
           description="Rapport de synthèse RH complet : indicateurs clés par département, masse salariale globale et vue d'ensemble de la période."
           stats={[
-            { icon: '🏢', label: `${[...new Set(employees.map(e => e.department))].length} départements` },
-            { icon: '👥', label: `${employees.filter(e => e.status === 'Actif').length} actifs` },
+            { icon: Building2, label: `${[...new Set(employees.map(e => e.department))].length} départements` },
+            { icon: UserRound, label: `${employees.filter(e => e.status === 'Actif').length} actifs` },
           ]}
           onExportPDF={handleGeneralPDF}
           loading={loading.generalPDF}

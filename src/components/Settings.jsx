@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Plus, Trash2, ListFilter, Sliders } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { usePermissions } from '../context/PermissionsContext';
+import { useToast } from '../context/ToastContext';
 import UserManagement from './UserManagement';
 
 export default function Settings() {
   const { isSuperAdmin } = usePermissions();
+  const { toast, confirm } = useToast();
   const [settings, setSettings] = useState({
     departments: [],
     contractTypes: [],
@@ -20,6 +22,18 @@ export default function Settings() {
   const [newContractType, setNewContractType] = useState('');
 
   useEffect(() => {
+    // Load local settings immediately for instant UI rendering
+    const localSaved = localStorage.getItem('sirh_settings');
+    if (localSaved) {
+      try {
+        setSettings(JSON.parse(localSaved));
+        setLoading(false);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Then update from database service asynchronously
     dbService.getSettings()
       .then((data) => {
         setSettings(data);
@@ -43,7 +57,7 @@ export default function Settings() {
     e.preventDefault();
     if (!newDepartment.trim()) return;
     if (settings.departments.includes(newDepartment.trim())) {
-      alert("Ce département existe déjà.");
+      toast.warning("Ce département existe déjà.");
       return;
     }
     const updatedDepts = [...settings.departments, newDepartment.trim()];
@@ -52,10 +66,15 @@ export default function Settings() {
   };
 
   // Delete a department
-  const handleDeleteDept = (dept) => {
-    if (window.confirm(`Supprimer le département "${dept}" ?`)) {
+  const handleDeleteDept = async (dept) => {
+    const isConfirmed = await confirm({
+      title: "Supprimer le département ?",
+      message: `Êtes-vous sûr de vouloir supprimer le département "${dept}" ?`
+    });
+    if (isConfirmed) {
       const updatedDepts = settings.departments.filter(d => d !== dept);
       setSettings(prev => ({ ...prev, departments: updatedDepts }));
+      toast.success("Département retiré.");
     }
   };
 
@@ -64,7 +83,7 @@ export default function Settings() {
     e.preventDefault();
     if (!newContractType.trim()) return;
     if (settings.contractTypes.includes(newContractType.trim())) {
-      alert("Ce type de contrat existe déjà.");
+      toast.warning("Ce type de contrat existe déjà.");
       return;
     }
     const updatedContracts = [...settings.contractTypes, newContractType.trim()];
@@ -73,10 +92,15 @@ export default function Settings() {
   };
 
   // Delete a contract type
-  const handleDeleteContract = (type) => {
-    if (window.confirm(`Supprimer le type de contrat "${type}" ?`)) {
+  const handleDeleteContract = async (type) => {
+    const isConfirmed = await confirm({
+      title: "Supprimer le type de contrat ?",
+      message: `Êtes-vous sûr de vouloir supprimer le type de contrat "${type}" ?`
+    });
+    if (isConfirmed) {
       const updatedContracts = settings.contractTypes.filter(c => c !== type);
       setSettings(prev => ({ ...prev, contractTypes: updatedContracts }));
+      toast.success("Type de contrat retiré.");
     }
   };
 
@@ -90,24 +114,28 @@ export default function Settings() {
         overtimeRate: Number(settings.overtimeRate)
       };
       await dbService.saveSettings(dataToSave);
-      alert("Configuration sauvegardée avec succès !");
+      toast.success("Configuration sauvegardée avec succès !");
     } catch (err) {
-      alert("Erreur lors de l'enregistrement de la configuration.");
+      toast.error("Erreur lors de l'enregistrement de la configuration.");
     }
   };
 
   // Reset database to restored ISW Technosys dataset
   const handleResetDatabase = async () => {
-    if (window.confirm("Êtes-vous sûr de vouloir réinitialiser la base de données ? Toutes les données actuelles (locales ou Firestore) seront écrasées et remplacées par les données ISW Technosys Ltd reconstituées.")) {
+    const isConfirmed = await confirm({
+      title: "Réinitialiser la base de données ?",
+      message: "Êtes-vous sûr de vouloir réinitialiser la base de données ? Toutes les données actuelles (locales ou Firestore) seront écrasées et remplacées par les données de démonstration."
+    });
+    if (isConfirmed) {
       try {
         await dbService.resetDatabase();
-        alert("Base de données réinitialisée avec succès ! L'application va s'actualiser.");
-        window.location.reload();
+        toast.success("Base de données réinitialisée avec succès !");
+        setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
-        alert("Erreur lors de la réinitialisation : " + err.message);
+        toast.error("Erreur lors de la réinitialisation : " + err.message);
         // If it's a Firestore permission issue, reload anyway so local data loads
         if (err.message && err.message.includes("Permissions Firestore")) {
-          window.location.reload();
+          setTimeout(() => window.location.reload(), 1500);
         }
       }
     }

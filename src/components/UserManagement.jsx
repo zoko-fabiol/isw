@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PencilLine, Plus, Save, Trash2, UserRound, Power, X } from 'lucide-react';
 import { authService, buildDefaultPermissions, PERMISSION_TABS } from '../services/authService';
+import { useToast } from '../context/ToastContext';
 
 const createBlankForm = () => ({
   email: '',
@@ -14,6 +15,7 @@ const createBlankForm = () => ({
 const clonePermissions = (permissions) => JSON.parse(JSON.stringify(permissions || buildDefaultPermissions()));
 
 export default function UserManagement() {
+  const { toast, confirm } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -157,11 +159,16 @@ export default function UserManagement() {
   };
 
   const handleDeleteUser = async (user) => {
-    if (window.confirm(`Supprimer le compte ${user.email} ?`)) {
+    const isConfirmed = await confirm({
+      title: "Supprimer cet utilisateur ?",
+      message: `Êtes-vous sûr de vouloir supprimer définitivement le compte de ${user.email} ?`
+    });
+    if (isConfirmed) {
       try {
         await authService.removeUser(user.email);
         closeEdit();
         await loadUsers();
+        toast.success("Utilisateur supprimé.");
       } catch (err) {
         setError(err?.message || 'Impossible de supprimer le compte.');
       }

@@ -3,9 +3,11 @@ import { CreditCard, Printer, Sparkles, CheckCircle, FileText, X, Banknote, Wall
 import { dbService } from '../services/dbService';
 import { exportToPDF, exportToExcel, formatFCFA } from '../services/exportService';
 import { usePermissions } from '../context/PermissionsContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Payrolls() {
   const { can } = usePermissions();
+  const { toast, confirm } = useToast();
   const canGeneratePayroll = can('payrolls', 'add');
   const canSettlePayroll = can('payrolls', 'edit');
   const [employees, setEmployees] = useState([]);
@@ -14,7 +16,11 @@ export default function Payrolls() {
   const [overtime, setOvertime] = useState([]);
   const [payrolls, setPayrolls] = useState([]);
   const [settings, setSettings] = useState({ standardHours: 173, socialContributionRate: 12 });
-  const [selectedMonth, setSelectedMonth] = useState('2026-06');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthStr());
   
   const [selectedPayroll, setSelectedPayroll] = useState(null);
   const [isSlipOpen, setIsSlipOpen] = useState(false);
@@ -122,7 +128,7 @@ export default function Payrolls() {
   const handleGeneratePayrolls = async () => {
     const activeEmployees = employees.filter(emp => emp.status === 'Actif');
     if (activeEmployees.length === 0) {
-      alert("Aucun employé actif à traiter.");
+      toast.warning("Aucun employé actif à traiter.");
       return;
     }
 
@@ -167,10 +173,10 @@ export default function Payrolls() {
 
         await dbService.savePayroll(payrollData);
       }
-      alert(`Calcul des bulletins pour le mois de ${selectedMonth} effectué avec succès !`);
+      toast.success(`Calcul des bulletins pour le mois de ${selectedMonth} effectué avec succès !`);
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la génération des bulletins de paie.");
+      toast.error("Erreur lors de la génération des bulletins de paie.");
     }
   };
 
@@ -185,8 +191,43 @@ export default function Payrolls() {
       if (selectedPayroll && selectedPayroll.id === payroll.id) {
         setSelectedPayroll(updated);
       }
+      toast.success("Le bulletin de paie a été marqué comme réglé.");
     } catch (err) {
-      alert("Erreur lors du règlement du bulletin.");
+      toast.error("Erreur lors du règlement du bulletin.");
+    }
+  };
+
+  const handlePayAll = async () => {
+    const pendingPayrolls = filteredPayrolls.filter(p => p.paymentStatus !== 'Payé');
+    if (pendingPayrolls.length === 0) {
+      toast.info("Aucun bulletin en attente de paiement pour ce mois.");
+      return;
+    }
+
+    const isConfirmed = await confirm({
+      title: "Règlement groupé des bulletins",
+      message: `Êtes-vous sûr de vouloir marquer comme "Payé" les ${pendingPayrolls.length} bulletins de paie de ce mois ? Cette action est irréversible.`,
+      confirmText: "Oui, tout régler",
+      cancelText: "Annuler",
+      type: "info"
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      for (const pay of pendingPayrolls) {
+        const updated = {
+          ...pay,
+          paymentStatus: 'Payé',
+          paymentDate: todayStr
+        };
+        await dbService.savePayroll(updated);
+      }
+      toast.success(`Les ${pendingPayrolls.length} bulletins ont été marqués comme réglés avec succès !`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Une erreur est survenue lors du règlement groupé.");
     }
   };
 
@@ -315,11 +356,22 @@ export default function Payrolls() {
 
         {/* List of Generated payroll slips — REDESIGNED TO CARDS */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h3 className="text-lg font-bold text-slate-800">Bulletins du Mois</h3>
-            <span className="text-xs font-bold bg-isw-blue-50 text-isw-blue px-3 py-1 rounded-xl">
-              {filteredPayrolls.length} bulletins calculés
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold bg-isw-blue-50 text-isw-blue px-3 py-1 rounded-xl">
+                {filteredPayrolls.length} bulletins calculés
+              </span>
+              {canSettlePayroll && filteredPayrolls.some(p => p.paymentStatus !== 'Payé') && (
+                <button
+                  onClick={handlePayAll}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-md shadow-emerald-600/10 flex items-center gap-1.5 transition-all text-xs"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>Régler tout</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {filteredPayrolls.length === 0 ? (

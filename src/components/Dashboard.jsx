@@ -7,7 +7,11 @@ import { dbService } from '../services/dbService';
 import { exportToPDF, formatFCFA } from '../services/exportService';
 
 export default function Dashboard() {
-  const [selectedMonth, setSelectedMonth] = useState('2026-06');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthStr());
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [delays, setDelays] = useState([]);

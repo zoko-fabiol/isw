@@ -4,13 +4,13 @@ import { PermissionsProvider, usePermissions } from './context/PermissionsContex
 import { PERMISSION_TABS } from './services/authService';
 import { quickAccessService } from './services/quickAccessService';
 import { windowsHelloService } from './services/windowsHelloService';
+import { ToastProvider } from './context/ToastContext';
 import Sidebar from './components/Sidebar';
 import Login from './components/Login';
 import QuickUnlock from './components/QuickUnlock';
 import Dashboard from './components/Dashboard';
 import Employees from './components/Employees';
 import Attendance from './components/Attendance';
-import Delays from './components/Delays';
 import OvertimeLeaves from './components/OvertimeLeaves';
 import Payrolls from './components/Payrolls';
 import Reports from './components/Reports';
@@ -201,7 +201,6 @@ function Shell({ activeTab, setActiveTab, user, handleLogout, isSidebarOpen, set
       case 'dashboard':    return <Dashboard />;
       case 'employees':    return <Employees />;
       case 'attendance':   return <Attendance />;
-      case 'delays':       return <Delays />;
       case 'leaves':       return <OvertimeLeaves />;
       case 'payrolls':     return <Payrolls />;
       case 'reports':      return <Reports />;
@@ -215,66 +214,68 @@ function Shell({ activeTab, setActiveTab, user, handleLogout, isSidebarOpen, set
   const tabAllowed = canViewTab(activeTab);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100 font-sans relative">
-      {/* Sidebar - responsive layout wrapper */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          setIsSidebarOpen(false); // Auto close sidebar on select in mobile layout
-        }}
-        user={user}
-        handleLogout={handleLogout}
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-      />
-
-      {/* Mobile Top Header */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="lg:hidden flex items-center justify-between bg-isw-navy text-white px-5 py-4 border-b border-isw-navy-dark/40">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 hover:bg-isw-navy-light rounded-xl transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <span className="font-extrabold text-lg tracking-wider">ISW SIRH</span>
-          </div>
-          <span className="text-xs bg-isw-blue/30 border border-isw-blue/30 px-2.5 py-0.5 rounded-full text-isw-teal font-bold">
-            Mobile v1.0
-          </span>
-        </header>
-
-        <main className="flex-1 overflow-y-auto">
-          {tabAllowed ? (
-            renderContent()
-          ) : (
-            <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
-              <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.7-3L13.7 4a2 2 0 00-3.4 0L3.3 16A2 2 0 005 19z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-extrabold text-slate-800">Accès non autorisé</h2>
-              <p className="text-slate-500 text-sm mt-1 max-w-sm">
-                Vous n'avez pas la permission d'afficher cet onglet. Contactez le Super Admin si cela semble être une erreur.
-              </p>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Mobile Backdrop overlay */}
-      {isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30"
+    <ToastProvider>
+      <div className="flex h-screen overflow-hidden bg-slate-100 font-sans relative">
+        {/* Sidebar - responsive layout wrapper */}
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setIsSidebarOpen(false); // Auto close sidebar on select in mobile layout
+          }}
+          user={user}
+          handleLogout={handleLogout}
+          isOpen={isSidebarOpen}
+          setIsOpen={setIsSidebarOpen}
         />
-      )}
-    </div>
+
+        {/* Mobile Top Header */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <header className="lg:hidden flex items-center justify-between bg-isw-navy text-white px-5 py-4 border-b border-isw-navy-dark/40">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-1.5 hover:bg-isw-navy-light rounded-xl transition-all"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <span className="font-extrabold text-lg tracking-wider">ISW SIRH</span>
+            </div>
+            <span className="text-xs bg-isw-blue/30 border border-isw-blue/30 px-2.5 py-0.5 rounded-full text-isw-teal font-bold">
+              Mobile v1.0
+            </span>
+          </header>
+
+          <main className="flex-1 overflow-y-auto">
+            {tabAllowed ? (
+              renderContent()
+            ) : (
+              <div className="flex flex-col items-center justify-center min-h-screen text-center px-6">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.7-3L13.7 4a2 2 0 00-3.4 0L3.3 16A2 2 0 005 19z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-extrabold text-slate-800">Accès non autorisé</h2>
+                <p className="text-slate-500 text-sm mt-1 max-w-sm">
+                  Vous n'avez pas la permission d'afficher cet onglet. Contactez le Super Admin si cela semble être une erreur.
+                </p>
+              </div>
+            )}
+          </main>
+        </div>
+
+        {/* Mobile Backdrop overlay */}
+        {isSidebarOpen && (
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30"
+          />
+        )}
+      </div>
+    </ToastProvider>
   );
 }
 

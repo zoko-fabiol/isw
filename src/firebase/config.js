@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 // Configuration Firebase ISW Technosys
@@ -31,12 +31,21 @@ const createSecondaryApp = (appName = 'isw-secondary-auth') => {
 
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app);
+  
+  // Activer la persistance hors ligne (Offline Persistence Cache) native de Firestore.
+  // Permet de lire et écrire localement en cache quand on est offline.
+  // Les données se synchronisent automatiquement avec le cloud Firebase lors du retour de la connexion.
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+  
   auth = getAuth(app);
   isFirebaseEnabled = true;
-  console.log("✅ Firebase ISW connecté avec succès (projet : isw-f05b3)");
+  console.log("✅ Firebase connecté en production avec persistance hors ligne activée (projet : isw-f05b3)");
 } catch (error) {
-  console.warn("⚠️ Erreur Firebase, bascule en mode LocalStorage :", error);
+  console.warn("⚠️ Erreur d'initialisation Firebase, bascule en mode LocalStorage pur :", error);
   isFirebaseEnabled = false;
 }
 

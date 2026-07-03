@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, Check, X as CancelIcon, Trash2, CalendarDays, Award, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar, Clock, Plus, Check, X as CancelIcon, Trash2, CalendarDays, Award, TrendingUp, TrendingDown, FileText } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { exportToPDF, exportToExcel, formatFCFA } from '../services/exportService';
+import { useToast } from '../context/ToastContext';
 import { usePermissions } from '../context/PermissionsContext';
 
 export default function OvertimeLeaves() {
   const { can } = usePermissions();
+  const { toast, confirm } = useToast();
   const canAddOvertime = can('leaves', 'add');
   const canEditLeave = can('leaves', 'edit');
   const canDeleteLeavePermission = can('leaves', 'delete');
@@ -14,7 +16,11 @@ export default function OvertimeLeaves() {
   const [overtimeList, setOvertimeList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
   const [settings, setSettings] = useState({ standardHours: 173, expectedTime: '08:00' });
-  const [selectedMonth, setSelectedMonth] = useState('2026-06');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthStr());
 
   const [otEmpId, setOtEmpId] = useState('');
   const [otActualHours, setOtActualHours] = useState('');
@@ -144,8 +150,8 @@ export default function OvertimeLeaves() {
     try {
       await dbService.saveOvertime(otData);
       setOtEmpId(''); setOtActualHours('');
-      alert("Heures enregistrées avec succès !");
-    } catch { alert("Erreur lors de l'enregistrement des heures."); }
+      toast.success("Heures enregistrées avec succès !");
+    } catch { toast.error("Erreur lors de l'enregistrement des heures."); }
   };
 
   const handleLvSubmit = async (e) => {
@@ -160,19 +166,27 @@ export default function OvertimeLeaves() {
     try {
       await dbService.saveLeave(leaveData);
       setLvEmpId(''); setLvStart(''); setLvEnd(''); setLvNotes(''); setLvStatus('En attente');
-      alert("Demande de congé enregistrée avec succès !");
-    } catch { alert("Erreur lors de l'enregistrement du congé."); }
+      toast.success("Demande de congé enregistrée avec succès !");
+    } catch { toast.error("Erreur lors de l'enregistrement du congé."); }
   };
 
   const handleUpdateLeaveStatus = async (leave, newStatus) => {
     try { await dbService.saveLeave({ ...leave, status: newStatus }); }
-    catch { alert("Erreur de mise à jour du statut."); }
+    catch { toast.error("Erreur de mise à jour du statut."); }
   };
 
   const handleDeleteLeave = async (id) => {
-    if (window.confirm("Supprimer ce congé ?")) {
-      try { await dbService.deleteLeave(id); }
-      catch { alert("Erreur de suppression."); }
+    const isConfirmed = await confirm({
+      title: "Supprimer ce congé ?",
+      message: "Êtes-vous sûr de vouloir supprimer définitivement cette demande de congé ?"
+    });
+    if (isConfirmed) {
+      try {
+        await dbService.deleteLeave(id);
+        toast.success("Congé supprimé.");
+      } catch {
+        toast.error("Erreur de suppression.");
+      }
     }
   };
 
@@ -230,9 +244,20 @@ export default function OvertimeLeaves() {
                 padding: '0.5rem 1rem', borderRadius: '0.75rem', fontWeight: 700, fontSize: '0.75rem',
                 border: 'none', cursor: 'pointer', transition: 'all 0.2s',
                 background: activeSubTab === tab ? '#2E8BC0' : 'transparent',
-                color: activeSubTab === tab ? 'white' : '#64748b'
+                color: activeSubTab === tab ? 'white' : '#64748b',
+                display: 'flex', alignItems: 'center', gap: '0.375rem'
               }}>
-                {tab === 'overtime' ? '⏱ Heures Supp.' : '🌴 Congés'}
+                {tab === 'overtime' ? (
+                  <>
+                    <Clock style={{ width: 14, height: 14 }} />
+                    <span>Heures Supp.</span>
+                  </>
+                ) : (
+                  <>
+                    <Calendar style={{ width: 14, height: 14 }} />
+                    <span>Congés</span>
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -269,18 +294,23 @@ export default function OvertimeLeaves() {
           {/* Overtime KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             {[
-              { icon: '⏱', label: 'Déclarations ce mois', value: filteredOvertimes.length, color: '#2E8BC0', bg: '#EBF5FB' },
-              { icon: '📈', label: 'H. Sup totales', value: `${totalOtHours} h`, color: '#059669', bg: '#ecfdf5' },
-              { icon: '💰', label: 'Rémunération H.Sup', value: formatFCFA(totalOtPay), color: '#0369a1', bg: '#eff6ff' },
-            ].map((kpi, i) => (
-              <div key={i} style={{ background: 'white', borderRadius: '1.25rem', padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '0.875rem', background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 }}>{kpi.icon}</div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>{kpi.label}</p>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '1.375rem', fontWeight: 800, color: '#1e293b' }}>{kpi.value}</p>
+              { icon: Clock, label: 'Déclarations ce mois', value: filteredOvertimes.length, color: '#2E8BC0', bg: '#EBF5FB' },
+              { icon: TrendingUp, label: 'H. Sup totales', value: `${totalOtHours} h`, color: '#059669', bg: '#ecfdf5' },
+              { icon: Award, label: 'Rémunération H.Sup', value: formatFCFA(totalOtPay), color: '#0369a1', bg: '#eff6ff' },
+            ].map((kpi, i) => {
+              const KpiIcon = kpi.icon;
+              return (
+                <div key={i} style={{ background: 'white', borderRadius: '1.25rem', padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '0.875rem', background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color, flexShrink: 0 }}>
+                    <KpiIcon style={{ width: 20, height: 20 }} />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>{kpi.label}</p>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '1.375rem', fontWeight: 800, color: '#1e293b' }}>{kpi.value}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Overtime Layout */}
@@ -362,8 +392,8 @@ export default function OvertimeLeaves() {
             {/* Overtime Cards */}
             <div className="lg:col-span-2">
               {filteredOvertimes.length === 0 ? (
-                <div style={{ background: 'white', borderRadius: '1.5rem', padding: '4rem 2rem', textAlign: 'center', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏱</div>
+                <div style={{ background: 'white', borderRadius: '1.5rem', padding: '4rem 2rem', textAlign: 'center', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Clock style={{ width: 48, height: 48, color: '#94a3b8', marginBottom: '1rem' }} />
                   <p style={{ color: '#94a3b8', fontWeight: 600, margin: 0 }}>Aucune déclaration d'heures pour ce mois.</p>
                 </div>
               ) : (
@@ -417,18 +447,23 @@ export default function OvertimeLeaves() {
           {/* Leaves KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             {[
-              { icon: '📋', label: 'Demandes ce mois', value: filteredLeaves.length, color: '#2E8BC0', bg: '#EBF5FB' },
-              { icon: '⏳', label: 'En attente', value: pendingLeaves, color: '#d97706', bg: '#fffbeb' },
-              { icon: '📅', label: 'Jours ouvrés', value: `${totalLeaveDays} j`, color: '#0369a1', bg: '#eff6ff' },
-            ].map((kpi, i) => (
-              <div key={i} style={{ background: 'white', borderRadius: '1.25rem', padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '0.875rem', background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 }}>{kpi.icon}</div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>{kpi.label}</p>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '1.375rem', fontWeight: 800, color: '#1e293b' }}>{kpi.value}</p>
+              { icon: FileText, label: 'Demandes ce mois', value: filteredLeaves.length, color: '#2E8BC0', bg: '#EBF5FB' },
+              { icon: Clock, label: 'En attente', value: pendingLeaves, color: '#d97706', bg: '#fffbeb' },
+              { icon: CalendarDays, label: 'Jours ouvrés', value: `${totalLeaveDays} j`, color: '#0369a1', bg: '#eff6ff' },
+            ].map((kpi, i) => {
+              const KpiIcon = kpi.icon;
+              return (
+                <div key={i} style={{ background: 'white', borderRadius: '1.25rem', padding: '1.25rem 1.5rem', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '0.875rem', background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color, flexShrink: 0 }}>
+                    <KpiIcon style={{ width: 20, height: 20 }} />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>{kpi.label}</p>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '1.375rem', fontWeight: 800, color: '#1e293b' }}>{kpi.value}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Leaves Layout */}
@@ -477,7 +512,7 @@ export default function OvertimeLeaves() {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Date Début</label>
                     <input type="date" value={lvStart} onChange={e => setLvStart(e.target.value)}
@@ -527,8 +562,8 @@ export default function OvertimeLeaves() {
             {/* Leave Cards */}
             <div className="lg:col-span-2">
               {filteredLeaves.length === 0 ? (
-                <div style={{ background: 'white', borderRadius: '1.5rem', padding: '4rem 2rem', textAlign: 'center', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🌴</div>
+                <div style={{ background: 'white', borderRadius: '1.5rem', padding: '4rem 2rem', textAlign: 'center', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <CalendarDays style={{ width: 48, height: 48, color: '#94a3b8', marginBottom: '1rem' }} />
                   <p style={{ color: '#94a3b8', fontWeight: 600, margin: 0 }}>Aucun congé enregistré pour cette période.</p>
                 </div>
               ) : (

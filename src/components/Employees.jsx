@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit2, Trash2, Filter, 
-  UserPlus, MapPin, Phone, Mail, Award, X 
+  UserPlus, MapPin, Phone, Mail, Award, X, Download, PlusCircle
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { usePermissions } from '../context/PermissionsContext';
+import { useToast } from '../context/ToastContext';
+import { exportToPDF, exportEmployeesWord } from '../services/exportService';
 
 export default function Employees() {
   const { can } = usePermissions();
+  const { toast, confirm } = useToast();
   const canAddEmployee = can('employees', 'add');
   const canEditEmployee = can('employees', 'edit');
   const canDeleteEmployee = can('employees', 'delete');
@@ -21,6 +24,38 @@ export default function Employees() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   
+  // Export list modal states
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState([
+    { key: 'id', label: 'Matricule', selected: true },
+    { key: 'firstName', label: 'Nom', selected: true },
+    { key: 'lastName', label: 'Prénom', selected: true },
+    { key: 'role', label: 'Poste', selected: true },
+    { key: 'department', label: 'Département', selected: true },
+    { key: 'contractType', label: 'Contrat', selected: false },
+    { key: 'baseSalary', label: 'Salaire de base', selected: false },
+    { key: 'phone', label: 'Téléphone', selected: false },
+    { key: 'email', label: 'Email', selected: false },
+  ]);
+  const [customColumns, setCustomColumns] = useState([]); // Array of strings (custom empty column names)
+  const [newCustomColumnName, setNewCustomColumnName] = useState('');
+  const [exportFormat, setExportFormat] = useState('pdf'); // 'pdf' or 'word'
+  const [presets, setPresets] = useState([]);
+  const [selectedPresetName, setSelectedPresetName] = useState('');
+  const [newPresetName, setNewPresetName] = useState('');
+
+  // Load presets on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('sirh_export_presets');
+    if (saved) {
+      try {
+        setPresets(JSON.parse(saved));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }, []);
+
   // Form states
   const [formId, setFormId] = useState('');
   const [formFirstName, setFormFirstName] = useState('');
@@ -105,11 +140,17 @@ export default function Employees() {
 
   // Handle delete
   const handleDeleteClick = async (empId) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'employé ${empId} ?`)) {
+    const hasConfirmed = await confirm({
+      title: "Supprimer le collaborateur",
+      message: `Êtes-vous sûr de vouloir supprimer définitivement l'employé ${empId} ? Cette action est irréversible.`,
+      type: "danger"
+    });
+    if (hasConfirmed) {
       try {
         await dbService.deleteEmployee(empId);
+        toast.success(`Employé ${empId} supprimé avec succès.`);
       } catch (err) {
-        alert("Erreur lors de la suppression de l'employé.");
+        toast.error("Erreur lors de la suppression de l'employé.");
       }
     }
   };
@@ -166,8 +207,9 @@ export default function Employees() {
     try {
       await dbService.saveEmployee(employeeData);
       setIsModalOpen(false);
+      toast.success(editingEmployee ? "Collaborateur mis à jour." : "Nouveau collaborateur créé.");
     } catch (err) {
-      alert("Erreur lors de l'enregistrement de l'employé.");
+      toast.error("Erreur lors de l'enregistrement de l'employé.");
     }
   };
 
@@ -192,6 +234,114 @@ export default function Employees() {
       .replace('XOF', 'FCFA');
   };
 
+  // Export List Logic
+  const handleToggleColumn = (index) => {
+    setSelectedColumns(prev => prev.map((col, idx) => idx === index ? { ...col, selected: !col.selected } : col));
+  };
+
+  const handleAddCustomColumn = () => {
+    if (!newCustomColumnName.trim()) return;
+    if (customColumns.includes(newCustomColumnName.trim())) {
+      toast.warning("Cette colonne existe déjà.");
+      return;
+    }
+    setCustomColumns(prev => [...prev, newCustomColumnName.trim()]);
+    setNewCustomColumnName('');
+  };
+
+  const handleRemoveCustomColumn = (index) => {
+    setCustomColumns(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSavePreset = () => {
+    if (!newPresetName.trim()) {
+      toast.error("Veuillez saisir un nom pour le modèle de disposition.");
+      return;
+    }
+    const presetName = newPresetName.trim();
+    const activeColsKeys = selectedColumns.filter(c => c.selected).map(c => c.key);
+    
+    const newPreset = {
+      name: presetName,
+      selectedKeys: activeColsKeys,
+      customColumns: customColumns
+    };
+
+    let updatedPresets = [...presets];
+    const existingIndex = presets.findIndex(p => p.name.toLowerCase() === presetName.toLowerCase());
+    if (existingIndex > -1) {
+      updatedPresets[existingIndex] = newPreset;
+    } else {
+      updatedPresets.push(newPreset);
+    }
+
+    setPresets(updatedPresets);
+    localStorage.setItem('sirh_export_presets', JSON.stringify(updatedPresets));
+    setSelectedPresetName(presetName);
+    setNewPresetName('');
+    toast.success(`Modèle "${presetName}" enregistré avec succès.`);
+  };
+
+  const handleLoadPreset = (presetName) => {
+    setSelectedPresetName(presetName);
+    if (!presetName) return;
+    const preset = presets.find(p => p.name === presetName);
+    if (preset) {
+      setSelectedColumns(prev => prev.map(col => ({ ...col, selected: preset.selectedKeys.includes(col.key) })));
+      setCustomColumns(preset.customColumns || []);
+      toast.success(`Modèle "${presetName}" chargé.`);
+    }
+  };
+
+  const handleDeletePreset = (presetName) => {
+    const updated = presets.filter(p => p.name !== presetName);
+    setPresets(updated);
+    localStorage.setItem('sirh_export_presets', JSON.stringify(updated));
+    if (selectedPresetName === presetName) {
+      setSelectedPresetName('');
+    }
+    toast.success(`Modèle "${presetName}" supprimé.`);
+  };
+
+  const triggerStaffExport = async () => {
+    setIsExportModalOpen(false);
+    const activeCols = selectedColumns.filter(c => c.selected);
+    
+    if (activeCols.length === 0 && customColumns.length === 0) {
+      toast.error("Veuillez sélectionner au moins une colonne.");
+      return;
+    }
+
+    const headers = [...activeCols.map(c => c.label), ...customColumns];
+    const dataRows = filteredEmployees.map(emp => {
+      const activeData = activeCols.map(col => {
+        if (col.key === 'baseSalary') return formatFCFA(emp[col.key]);
+        return emp[col.key] || '';
+      });
+      // Add empty cells for custom empty columns
+      const blankData = customColumns.map(() => '');
+      return [...activeData, ...blankData];
+    });
+
+    const reportTitle = "LISTE DU PERSONNEL ISW";
+    
+    if (exportFormat === 'pdf') {
+      try {
+        await exportToPDF(reportTitle, "Registre Global", headers, dataRows, `liste-personnel-${Date.now()}`);
+        toast.success("Liste du personnel exportée en PDF.");
+      } catch (err) {
+        toast.error("Erreur lors de l'exportation PDF.");
+      }
+    } else {
+      try {
+        exportEmployeesWord(headers, dataRows, reportTitle);
+        toast.success("Liste du personnel exportée sous Word.");
+      } catch (err) {
+        toast.error("Erreur lors de l'exportation Word.");
+      }
+    }
+  };
+
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
       {/* Header */}
@@ -202,15 +352,24 @@ export default function Employees() {
             Gérez la liste de vos collaborateurs, leurs fiches contractuelles et de salaire.
           </p>
         </div>
-        {canAddEmployee && (
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={handleAddClick}
-            className="bg-isw-blue hover:bg-isw-blue-light text-white font-bold px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-isw-blue/20 transition-all duration-200"
+            onClick={() => setIsExportModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-purple-600/10 transition-all duration-200"
           >
-            <Plus className="w-5 h-5" />
-            <span>Ajouter un Employé</span>
+            <Download className="w-4.5 h-4.5" />
+            <span>Exporter la Liste</span>
           </button>
-        )}
+          {canAddEmployee && (
+            <button
+              onClick={handleAddClick}
+              className="bg-isw-blue hover:bg-isw-blue-light text-white font-bold px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-isw-blue/20 transition-all duration-200"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Ajouter un Employé</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Summary banner */}
@@ -622,6 +781,177 @@ export default function Employees() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EXPORT LIST MODAL */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            onClick={() => setIsExportModalOpen(false)} 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+          />
+          <div className="relative bg-white rounded-3xl p-6 w-full max-w-lg border border-slate-100 shadow-2xl z-10 animate-in zoom-in-95 duration-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-slate-50 pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-800">
+                  Exporter la liste du personnel
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                  Configurez les colonnes et le format d'export
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-1 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Presets Management Section */}
+            <div className="p-3 bg-purple-50/30 border border-purple-100 rounded-2xl flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <label className="block text-slate-700 text-xs font-bold">Modèles de dispositions enregistrés</label>
+                {selectedPresetName && (
+                  <button
+                    onClick={() => handleDeletePreset(selectedPresetName)}
+                    className="text-[10px] text-rose-500 hover:text-rose-700 font-extrabold"
+                  >
+                    Supprimer ce modèle
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedPresetName}
+                  onChange={(e) => handleLoadPreset(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none"
+                >
+                  <option value="">-- Choisir un modèle --</option>
+                  {presets.map(p => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 items-center border-t border-purple-100/50 pt-2.5">
+                <input
+                  type="text"
+                  placeholder="Enregistrer la disposition actuelle sous..."
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none"
+                />
+                <button
+                  onClick={handleSavePreset}
+                  className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
+                >
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+
+            {/* Step 1: Select Built-in Columns */}
+            <div>
+              <label className="block text-slate-700 text-xs font-bold mb-2">1. Informations de l'employé à inclure</label>
+              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                {selectedColumns.map((col, index) => (
+                  <label key={col.key} className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer hover:text-slate-800 select-none">
+                    <input
+                      type="checkbox"
+                      checked={col.selected}
+                      onChange={() => handleToggleColumn(index)}
+                      className="w-4 h-4 rounded border-slate-300 text-isw-blue focus:ring-isw-blue"
+                    />
+                    <span>{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 2: Create Custom Empty Columns */}
+            <div>
+              <label className="block text-slate-700 text-xs font-bold mb-2">2. Ajouter des colonnes vierges (écriture papier/manuelle)</label>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="Ex : Émargement, Remarques..."
+                  value={newCustomColumnName}
+                  onChange={(e) => setNewCustomColumnName(e.target.value)}
+                  className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomColumn}
+                  className="px-4 py-2.5 bg-isw-blue hover:bg-isw-blue-light text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-all"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Ajouter</span>
+                </button>
+              </div>
+
+              {customColumns.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-3 bg-purple-50/50 border border-purple-100 rounded-2xl">
+                  {customColumns.map((colName, index) => (
+                    <span key={index} className="inline-flex items-center gap-1 bg-white border border-purple-200/60 px-2.5 py-1 rounded-xl text-[10px] font-bold text-purple-700">
+                      <span>{colName}</span>
+                      <button 
+                        onClick={() => handleRemoveCustomColumn(index)}
+                        className="p-0.5 hover:bg-purple-100 rounded-md transition-colors"
+                      >
+                        <X className="w-3 h-3 text-purple-500" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Step 3: Choose Format */}
+            <div>
+              <label className="block text-slate-700 text-xs font-bold mb-2">3. Format d'exportation</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="exportFormat"
+                    value="pdf"
+                    checked={exportFormat === 'pdf'}
+                    onChange={() => setExportFormat('pdf')}
+                    className="w-4 h-4 text-isw-blue focus:ring-isw-blue"
+                  />
+                  <span>PDF (Charte ISW)</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="exportFormat"
+                    value="word"
+                    checked={exportFormat === 'word'}
+                    onChange={() => setExportFormat('word')}
+                    className="w-4 h-4 text-isw-blue focus:ring-isw-blue"
+                  />
+                  <span>Word (.DOC éditable)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 justify-end pt-4 border-t border-slate-50 mt-2">
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2.5 border border-slate-200 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={triggerStaffExport}
+                className="px-4 py-2.5 bg-isw-blue hover:bg-isw-blue-light text-white font-bold text-xs rounded-xl shadow-md shadow-isw-blue/10 transition-colors"
+              >
+                Télécharger
+              </button>
+            </div>
           </div>
         </div>
       )}

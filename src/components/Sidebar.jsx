@@ -11,8 +11,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, handleLogout, i
   const allMenuItems = [
     { id: 'dashboard',  label: 'Tableau de Bord',      icon: LayoutDashboard },
     { id: 'employees',  label: 'Base Personnel',         icon: Users },
-    { id: 'attendance', label: 'Présences',              icon: Clock },
-    { id: 'delays',     label: 'Retards',                icon: AlarmClock },
+    { id: 'attendance', label: 'Présences & Retards',    icon: Clock },
     { id: 'leaves',     label: 'Heures & Congés',        icon: CalendarDays },
     { id: 'payrolls',   label: 'Gestion des Paies',      icon: CreditCard },
     { id: 'reports',    label: 'Bilans',                 icon: FileText },
