@@ -1,0 +1,141 @@
+/* Google Font - Inter — must be first */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 27 58 92;     /* isw-navy: rgb(27, 58, 92) */
+    --color-accent:  46 139 192;   /* isw-blue: rgb(46, 139, 192) */
+  }
+
+  * {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: #2E8BC033 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #2E8BC044;
+    border-radius: 9999px;
+  }
+
+  html, body, #root {
+    height: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #1e293b;
+  }
+}
+
+/* ─── Utility additions ────────────────────────────────── */
+@layer utilities {
+  /* Smooth transitions */
+  .transition-fast { transition: all 150ms ease; }
+  .transition-std  { transition: all 250ms ease; }
+
+  /* Zebra rows */
+  .table-zebra tbody tr:nth-child(odd)  { @apply bg-slate-50/50; }
+  .table-zebra tbody tr:nth-child(even) { @apply bg-white; }
+
+  /* Glass card effect */
+  .glass {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  /* Status badge presets */
+  .badge-green  { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-red    { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200; }
+  .badge-orange { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-blue   { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200; }
+  .badge-violet { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200; }
+
+  /* Custom checkbox styles used in UserManagement */
+  .isw-checkbox {
+    @apply inline-flex items-center gap-2 text-sm;
+  }
+  .isw-checkbox input[type="checkbox"] {
+    @apply appearance-none w-5 h-5 rounded-lg border border-slate-300 bg-white flex items-center justify-center;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.02);
+  }
+  .isw-checkbox input[type="checkbox"]:checked {
+    @apply bg-isw-blue border-isw-blue text-white;
+  }
+  .isw-checkbox input[type="checkbox"]:checked::after {
+    content: '\\\2713'; /* check mark */
+    display: block;
+    color: white;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1;
+  }
+}
+
+/* ─── Print Styles (Pay Slip PDF) ──────────────────────── */
+@media print {
+  /* Hide everything except the modal/slip */
+  body > #root > div > aside,   /* sidebar */
+  body > #root > div > main > div > div.p-8 > div:not(#payslip-sheet),
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Full-page slip */
+  #payslip-sheet {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: auto;
+    padding: 24px 32px;
+    font-size: 11px;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Modal wrapper – remove styles for print */
+  .fixed.inset-0 {
+    position: static !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    display: block !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* The slip card itself */
+  .fixed.inset-0 > div {
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Page breaks */
+  h2 { page-break-before: always; }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+}
